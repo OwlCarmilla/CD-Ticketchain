@@ -71,7 +71,19 @@ public class BlockChain {
         }
     }
 
-    public void addData(String data) {
+    /**
+     * Re-reads the chain from the file, so blocks mined by other open windows
+     * are not lost. Keeps the current chain if the file does not exist yet.
+     */
+    public synchronized void reload() {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(FILENAME))) {
+            chain = (ArrayList<Block>) in.readObject();
+        } catch (Exception e) {
+        }
+    }
+
+    public synchronized void addData(String data) {
+        reload();
         String prev = chain.getLast().getCurrentHash();
         int nonce = MinerPOW.getNonceP(prev + data + DIFICULTY, DIFICULTY);
         String current = utils.SecurityUtils.getHash(prev + data + DIFICULTY + nonce);

@@ -31,19 +31,9 @@ import java.util.TreeSet;
  */
 public class TemplarServices {
 
-    //devolve o saldo do utilizador
+    //devolve o saldo do utilizador (transações + compras/vendas de bilhetes)
     public static double getAmount(String user, BlockChain bc) throws Exception {
-        double val = 0;
-        for (Block b : bc.getChain()) {
-            Transaction t = utils.Conversion.stringToObject(b.getData());
-            if (t.getTo().equalsIgnoreCase(user)) {
-                val += t.getValue();
-            }
-            if (t.getFrom().equalsIgnoreCase(user)) {
-                val -= t.getValue();
-            }
-        }
-        return val;
+        return ticketservice.TicketState.of(bc).getBalance(user);
     }
 
     public static List<String> getUsers(BlockChain bc) throws Exception {

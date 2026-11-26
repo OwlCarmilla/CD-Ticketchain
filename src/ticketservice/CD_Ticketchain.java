@@ -4,7 +4,7 @@
  */
 package ticketservice;
 
-import blockchain.BlockChain;
+import templarcoin.ui.TemplarLogin;
 
 /**
  *
@@ -13,12 +13,10 @@ import blockchain.BlockChain;
 public class CD_Ticketchain {
 
     /**
-     * Loads the blockchain (creating the genesis block on first run) and prints it.
+     * Opens the login window.
      */
-    public static void main(String[] args) throws Exception {
-        BlockChain bc = new BlockChain();
-        System.out.println("Blocks: " + bc.getChain().size());
-        System.out.println(bc);
+    public static void main(String[] args) {
+        TemplarLogin.main(args);
     }
 
 }
