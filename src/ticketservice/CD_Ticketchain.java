@@ -4,6 +4,8 @@
  */
 package ticketservice;
 
+import blockchain.BlockChain;
+
 /**
  *
  * @author Catarina Trabalho
@@ -11,10 +13,12 @@ package ticketservice;
 public class CD_Ticketchain {
 
     /**
-     * @param args the command line arguments
+     * Loads the blockchain (creating the genesis block on first run) and prints it.
      */
-    public static void main(String[] args) {
-        // TODO code application logic here
+    public static void main(String[] args) throws Exception {
+        BlockChain bc = new BlockChain();
+        System.out.println("Blocks: " + bc.getChain().size());
+        System.out.println(bc);
     }
-    
+
 }

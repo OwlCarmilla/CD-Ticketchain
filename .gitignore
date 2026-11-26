@@ -1,0 +1,9 @@
+# build output
+/build/
+/dist/
+/nbproject/private/
+
+# generated at runtime - never commit keys or chain state
+*.priv
+*.pub
+*.bc
