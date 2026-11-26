@@ -49,6 +49,18 @@ public class TemplarCoin extends javax.swing.JFrame {
         try {
             this.blockchain = new BlockChain();
             txtSenderName.setText(user);
+            // several users can be open at once: closing one window does not close the others
+            setTitle("TemplarCoin - " + user);
+            setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
+            // tab "Bilhetes" (tickets), refreshed every time it is selected
+            ticketservice.ui.TicketsPanel tickets
+                    = new ticketservice.ui.TicketsPanel(user, privKey, pubKey, blockchain, this::updateGui);
+            jTabbedPane1.addTab("Bilhetes", tickets);
+            jTabbedPane1.addChangeListener(e -> {
+                if (jTabbedPane1.getSelectedComponent() == tickets) {
+                    tickets.refresh();
+                }
+            });
             updateGui();
         } catch (Exception ex) {
             System.getLogger(TemplarCoin.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
@@ -56,6 +68,8 @@ public class TemplarCoin extends javax.swing.JFrame {
     }
 
     public void updateGui() {
+        // read blocks added by other windows
+        blockchain.reload();
         //interfaces não bloqueantes
         SwingUtilities.invokeLater(() -> { // Thread
 //--------------------------------------------------
@@ -381,7 +395,7 @@ public class TemplarCoin extends javax.swing.JFrame {
                 return;
             }
             Transaction tr = new Transaction(
-                    txtSenderName.getText(),
+                    user, // always the logged-in user, the balance checked above is theirs
                     txtNameReceiver.getText(),
                     value,
                     privKey);
@@ -418,7 +432,8 @@ public class TemplarCoin extends javax.swing.JFrame {
 
             try {
                 //converter para Transação
-                Transaction t = (Transaction) Conversion.stringToObject(b.getData());
+                // a block can hold a Transaction or a ticket record
+                Object t = Conversion.stringToObject(b.getData());
                 txtObject.setText(t.toString());
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, ex.getMessage(), "Erro de conversão", JOptionPane.ERROR_MESSAGE);

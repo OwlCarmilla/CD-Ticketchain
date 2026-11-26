@@ -244,7 +244,8 @@ public class TemplarLogin extends javax.swing.JFrame {
                 gui.setVisible(true);
             }
             ).start();
-            dispose();
+            // keep the login open to log in other users at the same time
+            txtLoginPass.setText("");
 
         } catch (Exception ex) {
             System.getLogger(TemplarLogin.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
