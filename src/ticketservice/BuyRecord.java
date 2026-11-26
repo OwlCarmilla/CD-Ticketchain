@@ -1,8 +1,12 @@
 package ticketservice;
 
 /**
- * A client buys a ticket from its current owner (the organizer, or a client
- * who put it up for resale). The coins and the ticket move together.
+ * Um cliente compra um bilhete ao seu dono atual: ao organizador (pelo preço
+ * original) ou a outro cliente que o pôs em revenda.
+ *
+ * É assinado pelo comprador, que assim aceita pagar o preço indicado.
+ * As moedas e o bilhete mudam de dono no mesmo registo, por isso uma compra
+ * nunca fica a meio.
  */
 public class BuyRecord extends TicketRecord {
 

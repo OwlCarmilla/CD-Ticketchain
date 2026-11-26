@@ -52,7 +52,7 @@ public class BlockChain {
         try {
             //creates new blockchain
             String prev = "000000";
-            // first run on a fresh checkout: key files are not in git, so create MASTER's
+            // primeira execução: as chaves não estão no git, por isso cria as do MASTER
             if (!java.nio.file.Files.exists(java.nio.file.Paths.get("MASTER.pub"))) {
                 java.security.KeyPair kp = SecurityUtils.generateKeyPair(2048);
                 SecurityUtils.savePublicKey(kp.getPublic(), "MASTER");
@@ -72,8 +72,8 @@ public class BlockChain {
     }
 
     /**
-     * Re-reads the chain from the file, so blocks mined by other open windows
-     * are not lost. Keeps the current chain if the file does not exist yet.
+     * Volta a ler a cadeia do ficheiro, para não perder blocos minerados
+     * noutras janelas abertas. Se o ficheiro ainda não existir, mantém a atual.
      */
     public synchronized void reload() {
         try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(FILENAME))) {
@@ -83,6 +83,7 @@ public class BlockChain {
     }
 
     public synchronized void addData(String data) {
+        // junta-se à versão mais recente da cadeia antes de minerar
         reload();
         String prev = chain.getLast().getCurrentHash();
         int nonce = MinerPOW.getNonceP(prev + data + DIFICULTY, DIFICULTY);

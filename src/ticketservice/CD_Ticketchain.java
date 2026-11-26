@@ -13,7 +13,7 @@ import templarcoin.ui.TemplarLogin;
 public class CD_Ticketchain {
 
     /**
-     * Opens the login window.
+     * Abre a janela de login.
      */
     public static void main(String[] args) {
         TemplarLogin.main(args);

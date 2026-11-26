@@ -1,7 +1,10 @@
 package ticketservice;
 
 /**
- * The current owner of a ticket puts it up for resale at a given price.
+ * O dono atual de um bilhete põe-no à venda (revenda) por um preço.
+ *
+ * A blockchain só aceita se quem assina for mesmo o dono e se o preço
+ * respeitar o limite de revenda definido pelo organizador.
  */
 public class ResaleRecord extends TicketRecord {
 

@@ -1,7 +1,8 @@
 package ticketservice;
 
 /**
- * A ticket record that breaks a rule, with the reason shown to the user.
+ * Lançada quando um registo de bilhetes não cumpre uma regra.
+ * A mensagem explica o motivo e é mostrada ao utilizador.
  */
 public class TicketException extends Exception {
 

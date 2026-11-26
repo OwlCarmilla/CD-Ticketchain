@@ -49,10 +49,10 @@ public class TemplarCoin extends javax.swing.JFrame {
         try {
             this.blockchain = new BlockChain();
             txtSenderName.setText(user);
-            // several users can be open at once: closing one window does not close the others
+            // vários utilizadores podem estar abertos ao mesmo tempo: fechar uma janela não fecha as outras
             setTitle("TemplarCoin - " + user);
             setDefaultCloseOperation(javax.swing.WindowConstants.DISPOSE_ON_CLOSE);
-            // tab "Bilhetes" (tickets), refreshed every time it is selected
+            // separador "Bilhetes", atualizado sempre que é selecionado
             ticketservice.ui.TicketsPanel tickets
                     = new ticketservice.ui.TicketsPanel(user, privKey, pubKey, blockchain, this::updateGui);
             jTabbedPane1.addTab("Bilhetes", tickets);
@@ -68,7 +68,7 @@ public class TemplarCoin extends javax.swing.JFrame {
     }
 
     public void updateGui() {
-        // read blocks added by other windows
+        // lê os blocos adicionados por outras janelas
         blockchain.reload();
         //interfaces não bloqueantes
         SwingUtilities.invokeLater(() -> { // Thread
@@ -395,7 +395,7 @@ public class TemplarCoin extends javax.swing.JFrame {
                 return;
             }
             Transaction tr = new Transaction(
-                    user, // always the logged-in user, the balance checked above is theirs
+                    user, // sempre o utilizador com sessão iniciada: o saldo verificado acima é o dele
                     txtNameReceiver.getText(),
                     value,
                     privKey);
@@ -432,7 +432,7 @@ public class TemplarCoin extends javax.swing.JFrame {
 
             try {
                 //converter para Transação
-                // a block can hold a Transaction or a ticket record
+                // um bloco pode ter uma Transaction ou um registo de bilhetes
                 Object t = Conversion.stringToObject(b.getData());
                 txtObject.setText(t.toString());
             } catch (Exception ex) {
