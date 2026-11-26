@@ -1,9 +1,9 @@
-# build output
+# resultado da compilação
 /build/
 /dist/
 /nbproject/private/
 
-# generated at runtime - never commit keys or chain state
+# criados ao executar - nunca enviar chaves nem a blockchain para o git
 *.priv
 *.pub
 *.bc

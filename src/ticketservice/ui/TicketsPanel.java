@@ -32,8 +32,12 @@ import ticketservice.TicketState;
 import ticketservice.TicketState.Ticket;
 
 /**
- * "Bilhetes" tab of the wallet window. Shows the organizer or the client view
- * depending on the role registered on the blockchain.
+ * Separador "Bilhetes" da carteira.
+ *
+ * Mostra uma de três vistas, conforme o papel do utilizador na blockchain:
+ * - sem papel: botões para se registar como organizador ou cliente;
+ * - organizador: emitir bilhetes e ver quem é dono de cada um;
+ * - cliente: comprar bilhetes e revender os seus.
  */
 public class TicketsPanel extends JPanel {
 
@@ -41,22 +45,22 @@ public class TicketsPanel extends JPanel {
     private final PrivateKey privKey;
     private final PublicKey pubKey;
     private final BlockChain blockchain;
-    private final Runnable onChange;
+    private final Runnable onChange; // atualiza o resto da carteira (saldo, lista de blocos)
 
     private final JLabel lblInfo = new JLabel();
     private final JLabel lblWorking = new JLabel("A minerar bloco...");
-    private final CardLayout cards = new CardLayout();
+    private final CardLayout cards = new CardLayout();        // troca entre as três vistas
     private final JPanel cardPanel = new JPanel(cards);
-    private final List<JButton> buttons = new ArrayList<>();
+    private final List<JButton> buttons = new ArrayList<>(); // desativados enquanto se mina
 
-    // organizer
+    // vista do organizador
     private final JTextField txtEvent = new JTextField("Concerto");
     private final JTextField txtQuantity = new JTextField("5");
     private final JTextField txtPrice = new JTextField("20");
     private final JTextField txtMaxResale = new JTextField("10");
     private final JTextArea txtIssued = new JTextArea();
 
-    // client
+    // vista do cliente (cada lista tem a lista de bilhetes correspondente às linhas)
     private final DefaultListModel<String> forSaleModel = new DefaultListModel<>();
     private final JList<String> lstForSale = new JList<>(forSaleModel);
     private List<Ticket> forSale = new ArrayList<>();
@@ -95,7 +99,7 @@ public class TicketsPanel extends JPanel {
     }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //:::::::::::::     LAYOUT     :::::::::::::::::::
+    //:::::::::::::     ECRÃS     :::::::::::::::::::
 
     private JPanel buildRegisterCard() {
         JPanel p = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
@@ -147,6 +151,7 @@ public class TicketsPanel extends JPanel {
         sale.add(saleButtons, BorderLayout.SOUTH);
 
         lstMine.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        // ao escolher um bilhete, preenche a revenda com o preço máximo permitido
         lstMine.addListSelectionListener(e -> {
             int i = lstMine.getSelectedIndex();
             if (!e.getValueIsAdjusting() && i >= 0 && i < mine.size()) {
@@ -180,7 +185,7 @@ public class TicketsPanel extends JPanel {
     }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //:::::::::::::     ACTIONS     :::::::::::::::::::
+    //:::::::::::::     AÇÕES     :::::::::::::::::::
 
     private void issueTickets() {
         try {
@@ -202,10 +207,13 @@ public class TicketsPanel extends JPanel {
             return;
         }
         Ticket t = forSale.get(i);
+        // compra ao dono atual, pelo preço a que está à venda
         submit(new BuyRecord(user, t.getOwner(), t.getId(), t.getSalePrice()),
                 "Comprou " + t.getId() + " por " + t.getSalePrice());
     }
 
+    // o id do bilhete é escrito à mão, para se poder mostrar que a blockchain
+    // rejeita a revenda de um bilhete que já não é nosso
     private void resell() {
         try {
             String ticketId = txtResaleTicket.getText().trim();
@@ -217,8 +225,8 @@ public class TicketsPanel extends JPanel {
     }
 
     /**
-     * Signs the record, checks it against the rules and mines it, without
-     * blocking the interface.
+     * Assina o registo, verifica as regras e mina o bloco numa thread à parte,
+     * para não bloquear a interface. No fim mostra se foi aceite ou rejeitado.
      */
     private void submit(TicketRecord record, String successMessage) {
         setBusy(true);
@@ -233,6 +241,7 @@ public class TicketsPanel extends JPanel {
                 error = "Erro: " + e.getMessage();
             }
             String result = error;
+            // a interface só pode ser alterada na thread do Swing
             SwingUtilities.invokeLater(() -> {
                 setBusy(false);
                 if (result == null) {
@@ -256,10 +265,11 @@ public class TicketsPanel extends JPanel {
     }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //:::::::::::::     REFRESH     :::::::::::::::::::
+    //:::::::::::::     ATUALIZAR     :::::::::::::::::::
 
     /**
-     * Re-reads the chain (other windows may have added blocks) and redraws.
+     * Volta a ler a blockchain do ficheiro (outras janelas podem ter
+     * adicionado blocos), recalcula o estado e redesenha o separador.
      */
     public void refresh() {
         new Thread(() -> {
@@ -269,12 +279,16 @@ public class TicketsPanel extends JPanel {
         }).start();
     }
 
+    /**
+     * Mostra o estado: papel e saldo no topo, e a vista certa para o papel.
+     */
     private void show(TicketState state) {
         RegisterRecord.Role role = state.getRole(user);
         lblInfo.setText("<html><b>" + user + "</b> · Papel: "
                 + (role == null ? "nenhum" : role) + " · Saldo: " + round(state.getBalance(user)) + " TC</html>");
         cards.show(cardPanel, role == null ? "none" : role.name());
 
+        // organizador: os bilhetes que emitiu e o dono atual de cada um
         StringBuilder issued = new StringBuilder();
         for (Ticket t : state.getTicketsIssuedBy(user)) {
             issued.append(t.getId()).append("   dono: ").append(t.getOwner());
@@ -287,6 +301,7 @@ public class TicketsPanel extends JPanel {
         }
         txtIssued.setText(issued.toString());
 
+        // cliente: bilhetes à venda (do organizador ou em revenda), exceto os seus
         forSale = new ArrayList<>();
         forSaleModel.clear();
         for (Ticket t : state.getTicketsForSale()) {
@@ -297,6 +312,7 @@ public class TicketsPanel extends JPanel {
             }
         }
 
+        // cliente: os bilhetes que tem
         mine = state.getTicketsOwnedBy(user);
         mineModel.clear();
         for (Ticket t : mine) {
@@ -306,6 +322,7 @@ public class TicketsPanel extends JPanel {
         }
     }
 
+    // arredonda a 2 casas decimais para mostrar
     private static double round(double v) {
         return Math.round(v * 100) / 100.0;
     }

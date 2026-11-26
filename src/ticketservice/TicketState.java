@@ -12,20 +12,26 @@ import templarcoin.Transaction;
 import utils.Conversion;
 
 /**
- * The current state of users, coins and tickets, built by replaying every block
- * of the chain. Also holds the rules a new record must follow before it is mined.
+ * Estado atual dos utilizadores, saldos e bilhetes.
+ *
+ * Este estado não fica guardado em lado nenhum: é recalculado sempre a partir
+ * dos blocos da blockchain, do primeiro ao último. A blockchain é a única
+ * fonte de verdade.
+ *
+ * Também contém as regras que um registo novo tem de cumprir antes de ser
+ * minerado (método check).
  */
 public class TicketState {
 
     /**
-     * One ticket and who owns it now.
+     * Um bilhete e quem é o seu dono neste momento.
      */
     public static class Ticket {
 
         private final String id;
         private final IssueTicketsRecord issue;
         private String owner;
-        private Double resalePrice; // null when not up for resale
+        private Double resalePrice; // null quando não está em revenda
 
         Ticket(String id, IssueTicketsRecord issue) {
             this.id = id;
@@ -57,32 +63,38 @@ public class TicketState {
             return issue.getMaxResalePrice();
         }
 
+        /**
+         * Ainda é do organizador, ou seja, ainda não foi vendido.
+         */
         public boolean isUnsold() {
             return same(owner, getOrganizer());
         }
 
         /**
-         * Price it can be bought for now, or null if it is not for sale.
+         * Preço a que pode ser comprado agora, ou null se não estiver à venda.
+         * Os bilhetes por vender estão sempre à venda pelo preço original.
          */
         public Double getSalePrice() {
             return isUnsold() ? Double.valueOf(getOriginalPrice()) : resalePrice;
         }
     }
 
-    private final Map<String, RegisterRecord> users = new HashMap<>();
-    private final Map<String, Double> balances = new HashMap<>();
-    private final Map<String, IssueTicketsRecord> events = new HashMap<>();
-    private final Map<String, Ticket> tickets = new LinkedHashMap<>();
+    private final Map<String, RegisterRecord> users = new HashMap<>();       // nome -> registo (papel e chave pública)
+    private final Map<String, Double> balances = new HashMap<>();           // nome -> saldo em Templar Coins
+    private final Map<String, IssueTicketsRecord> events = new HashMap<>(); // nome do evento -> emissão
+    private final Map<String, Ticket> tickets = new LinkedHashMap<>();      // id do bilhete -> bilhete
 
     /**
-     * Replays the whole chain. Coin transfers are applied as they are (teacher's
-     * Transaction); ticket records are only applied if they follow the rules.
+     * Percorre a blockchain toda e reconstrói o estado.
+     * As transferências de moedas (Transaction do professor) são aplicadas tal
+     * como estão; os registos de bilhetes só são aplicados se cumprirem as regras.
      */
     public static TicketState of(BlockChain bc) {
         TicketState s = new TicketState();
         for (Block b : bc.getChain()) {
             Object data;
             try {
+                // o conteúdo do bloco é um objeto convertido em texto (Base64)
                 data = Conversion.stringToObject(b.getData());
             } catch (Exception e) {
                 continue;
@@ -95,7 +107,7 @@ public class TicketState {
                     s.check(r);
                     s.apply(r);
                 } catch (TicketException e) {
-                    // an invalid record in the file is ignored
+                    // um registo inválido no ficheiro é ignorado
                 }
             }
         }
@@ -103,16 +115,19 @@ public class TicketState {
     }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //:::::::::::::     RULES     :::::::::::::::::::
+    //:::::::::::::     REGRAS     :::::::::::::::::::
 
     /**
-     * Throws TicketException with the reason if the record breaks a rule.
+     * Verifica se o registo pode entrar na blockchain.
+     * Lança TicketException com o motivo se não cumprir alguma regra.
      */
     public void check(TicketRecord r) throws TicketException {
+        // 1. a assinatura tem de ser válida (prova que foi mesmo o signatário)
         PublicKey key = signerKey(r);
         if (!r.verify(key)) {
             throw new TicketException("Assinatura inválida de " + r.getSigner());
         }
+        // 2. as regras de cada tipo de registo
         switch (r) {
             case RegisterRecord reg -> checkRegister(reg);
             case IssueTicketsRecord issue -> checkIssue(issue);
@@ -122,6 +137,10 @@ public class TicketState {
         }
     }
 
+    /**
+     * Chave pública de quem assinou: num registo de utilizador vem no próprio
+     * registo; nos outros vem do registo feito antes na blockchain.
+     */
     private PublicKey signerKey(TicketRecord r) throws TicketException {
         try {
             if (r instanceof RegisterRecord reg) {
@@ -141,6 +160,7 @@ public class TicketState {
         }
     }
 
+    // cada nome só se pode registar uma vez
     private void checkRegister(RegisterRecord reg) throws TicketException {
         RegisterRecord existing = users.get(key(reg.getSigner()));
         if (existing != null) {
@@ -151,6 +171,7 @@ public class TicketState {
         }
     }
 
+    // só organizadores emitem bilhetes, com nome de evento único e valores válidos
     private void checkIssue(IssueTicketsRecord issue) throws TicketException {
         requireRole(issue.getSigner(), RegisterRecord.Role.ORGANIZADOR, "Só organizadores podem emitir bilhetes");
         String event = issue.getEvent();
@@ -171,6 +192,7 @@ public class TicketState {
         }
     }
 
+    // só o dono atual pode revender, e nunca acima do limite do organizador
     private void checkResale(ResaleRecord resale) throws TicketException {
         requireRole(resale.getSigner(), RegisterRecord.Role.CLIENTE, "Só clientes podem revender bilhetes");
         Ticket t = requireTicket(resale.getTicketId());
@@ -181,6 +203,7 @@ public class TicketState {
         if (resale.getPrice() <= 0) {
             throw new TicketException("O preço tem de ser maior que 0");
         }
+        // 1e-9: margem para erros de arredondamento dos double (20 * 1.1 = 22.000000000000004)
         if (resale.getPrice() > t.getMaxResalePrice() + 1e-9) {
             throw new TicketException(String.format(
                     "Preço %.2f acima do limite de revenda: máximo %.2f (%.2f + %.0f%%)",
@@ -189,6 +212,7 @@ public class TicketState {
         }
     }
 
+    // um cliente compra ao dono atual, pelo preço de venda, se tiver saldo
     private void checkBuy(BuyRecord buy) throws TicketException {
         requireRole(buy.getBuyer(), RegisterRecord.Role.CLIENTE, "Só clientes podem comprar bilhetes");
         Ticket t = requireTicket(buy.getTicketId());
@@ -227,13 +251,17 @@ public class TicketState {
     }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //:::::::::::::     APPLY (record already checked)     :::::::::::::::::::
+    //:::::::::::::     APLICAR (registo já verificado)     :::::::::::::::::::
 
+    /**
+     * Atualiza o estado com um registo que já passou as regras.
+     */
     private void apply(TicketRecord r) {
         switch (r) {
             case RegisterRecord reg ->
                 users.put(key(reg.getSigner()), reg);
             case IssueTicketsRecord issue -> {
+                // cria os bilhetes do evento, todos na posse do organizador
                 events.put(key(issue.getEvent()), issue);
                 for (int i = 0; i < issue.getQuantity(); i++) {
                     String id = issue.ticketId(i);
@@ -243,6 +271,7 @@ public class TicketState {
             case ResaleRecord resale ->
                 tickets.get(key(resale.getTicketId())).resalePrice = resale.getPrice();
             case BuyRecord buy -> {
+                // as moedas passam do comprador para o vendedor e o bilhete muda de dono
                 Ticket t = tickets.get(key(buy.getTicketId()));
                 addCoins(buy.getBuyer(), -buy.getPrice());
                 addCoins(buy.getSeller(), buy.getPrice());
@@ -259,14 +288,14 @@ public class TicketState {
     }
 
     //::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
-    //:::::::::::::     QUERIES     :::::::::::::::::::
+    //:::::::::::::     CONSULTAS     :::::::::::::::::::
 
     public double getBalance(String user) {
         return balances.getOrDefault(key(user), 0.0);
     }
 
     /**
-     * The user's role, or null if not registered.
+     * Papel do utilizador, ou null se ainda não estiver registado.
      */
     public RegisterRecord.Role getRole(String user) {
         RegisterRecord reg = users.get(key(user));
@@ -307,7 +336,7 @@ public class TicketState {
         return list;
     }
 
-    // names are compared ignoring case, like the teacher's TemplarServices
+    // os nomes são comparados sem distinguir maiúsculas, como no TemplarServices do professor
     private static String key(String name) {
         return name == null ? "" : name.toLowerCase();
     }
